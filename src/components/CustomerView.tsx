@@ -16,6 +16,7 @@ import {
   Header,
   OfflineBanner,
   OrderCard,
+  OrderTotals,
   PresenceStatus,
   UnreadBanner,
   formatSize,
@@ -119,6 +120,7 @@ export default function CustomerView() {
       />
       <OfflineBanner show={offline} />
       <UnreadBanner orders={orders} />
+      <OrderTotals orders={orders} />
       <div className="columns">
         <section aria-labelledby="new-order">
           <h2 id="new-order">New order</h2>
