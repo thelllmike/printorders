@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Order } from "@/lib/types";
+import type { Order, Presence } from "@/lib/types";
 
 const REFRESH_MS = 5000;
 
 export function useOrders() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [offline, setOffline] = useState(false);
+  const [presence, setPresence] = useState<Presence | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -19,6 +20,7 @@ export function useOrders() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setOrders(data.orders);
+      setPresence(data.presence);
       setOffline(false);
     } catch {
       setOffline(true);
@@ -37,5 +39,5 @@ export function useOrders() {
     };
   }, [refresh]);
 
-  return { orders, setOrders, offline, refresh };
+  return { orders, setOrders, offline, presence, refresh };
 }
