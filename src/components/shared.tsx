@@ -71,6 +71,34 @@ export function UnreadBanner({ orders }: { orders: Order[] | null }) {
   );
 }
 
+export function OrderTotals({ orders }: { orders: Order[] | null }) {
+  if (!orders) return null;
+  const withStatus = (status: Order["status"]) =>
+    orders.filter((o) => o.status === status).length;
+  const printed = orders.reduce((sum, o) => sum + o.printedCopies, 0);
+  const copies = orders.reduce((sum, o) => sum + o.quantity, 0);
+
+  const totals = [
+    { label: "Total orders", value: orders.length },
+    { label: "Done", value: withStatus("ready") },
+    { label: "Ongoing", value: withStatus("ongoing") },
+    { label: "Pending", value: withStatus("pending") },
+    { label: "Copies printed", value: `${printed} of ${copies}` },
+    { label: "Not paid", value: orders.filter((o) => !o.paid).length },
+  ];
+
+  return (
+    <dl className="totals">
+      {totals.map(({ label, value }) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function FileRow({ file, onOpen }: { file: OrderFile; onOpen: () => void }) {
   const url = `/api/files/${file.id}`;
   return (

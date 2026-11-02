@@ -12,7 +12,14 @@ import {
   STATUS_LABELS,
   type Status,
 } from "@/lib/types";
-import { Header, OfflineBanner, OrderCard, PresenceStatus, UnreadBanner } from "./shared";
+import {
+  Header,
+  OfflineBanner,
+  OrderCard,
+  OrderTotals,
+  PresenceStatus,
+  UnreadBanner,
+} from "./shared";
 import { useOrders } from "./useOrders";
 
 type Filter = Status | "all";
@@ -233,6 +240,7 @@ export default function ShopView() {
       />
       <OfflineBanner show={offline} />
       <UnreadBanner orders={orders} />
+      <OrderTotals orders={orders} />
       {error && <p className="banner error" role="alert">{error}</p>}
 
       <div className="tabs" role="group" aria-label="Filter orders">
