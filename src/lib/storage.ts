@@ -47,7 +47,7 @@ export async function saveFile(file: PreparedFile) {
   await fs.writeFile(path.join(UPLOAD_DIR, file.storedName), file.data, { flag: "wx" });
 }
 
-export async function removeFiles(files: PreparedFile[]) {
+export async function removeFiles(files: Pick<PreparedFile, "storedName">[]) {
   await Promise.all(
     files.map((f) => fs.rm(path.join(UPLOAD_DIR, f.storedName), { force: true })),
   );

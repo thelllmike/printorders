@@ -1,7 +1,9 @@
 # Print Orders
 
 Send PDFs and images to a print shop with a quantity and a note. The shop marks each
-order Pending, Ongoing or Ready, and the customer's page updates within 5 seconds.
+order Pending, Ongoing or Ready, records how many copies are printed and whether the
+order is paid, and adds photos of the finished work. Both sides can preview PDFs in the
+page and chat about each order, and the customer's page updates within 5 seconds.
 
 Built with Next.js and SQLite. Everything is stored in the `data/` folder:
 

@@ -11,7 +11,15 @@ import {
   STATUS_LABELS,
   type Status,
 } from "@/lib/types";
-import { Header, OfflineBanner, OrderCard, formatSize } from "./shared";
+import {
+  CopiesProgress,
+  Header,
+  OfflineBanner,
+  OrderCard,
+  PresenceStatus,
+  UnreadBanner,
+  formatSize,
+} from "./shared";
 import { useOrders } from "./useOrders";
 
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp";
@@ -53,7 +61,7 @@ function upload(body: FormData, onProgress: (percent: number) => void) {
 }
 
 export default function CustomerView() {
-  const { orders, offline, refresh } = useOrders();
+  const { orders, offline, presence, refresh } = useOrders();
   const [files, setFiles] = useState<File[]>([]);
   const [quantity, setQuantity] = useState("1");
   const [note, setNote] = useState("");
@@ -105,8 +113,12 @@ export default function CustomerView() {
 
   return (
     <main className="page">
-      <Header title="Print Orders" />
+      <Header
+        title="Print Orders"
+        status={<PresenceStatus presence={presence} role="customer" />}
+      />
       <OfflineBanner show={offline} />
+      <UnreadBanner orders={orders} />
       <div className="columns">
         <section aria-labelledby="new-order">
           <h2 id="new-order">New order</h2>
@@ -197,7 +209,19 @@ export default function CustomerView() {
           )}
           <div className="orders">
             {orders?.map((order) => (
-              <OrderCard key={order.id} order={order}>
+              <OrderCard
+                key={order.id}
+                order={order}
+                role="customer"
+                presence={presence}
+                onChatClosed={refresh}
+              >
+                <div className="order-summary">
+                  <CopiesProgress printed={order.printedCopies} total={order.quantity} />
+                  <span className={order.paid ? "badge paid" : "badge unpaid"}>
+                    {order.paid ? "Paid" : "Not paid"}
+                  </span>
+                </div>
                 <Tracker status={order.status} />
               </OrderCard>
             ))}

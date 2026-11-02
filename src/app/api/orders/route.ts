@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRole } from "@/lib/auth";
-import { createOrder, listOrders } from "@/lib/db";
+import { createOrder, getPresence, listOrders, recordPresence } from "@/lib/db";
 import {
   type PreparedFile,
   prepareFile,
@@ -24,8 +24,14 @@ function fail(error: string, status = 400) {
 }
 
 export async function GET() {
-  if (!(await getRole())) return fail("Please log in", 401);
-  return NextResponse.json({ orders: listOrders() });
+  const role = await getRole();
+  if (!role) return fail("Please log in", 401);
+  // Open pages load the orders every 5 seconds, which doubles as their check-in.
+  recordPresence(role);
+  return NextResponse.json({
+    orders: listOrders(role),
+    presence: getPresence(role === "shop" ? "customer" : "shop"),
+  });
 }
 
 export async function POST(req: Request) {
