@@ -58,6 +58,10 @@ function getDb() {
       role TEXT PRIMARY KEY,
       last_seen TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
   migrate(db);
   return db;
@@ -80,6 +84,9 @@ function migrate(database: Database.Database) {
         UPDATE orders SET printed_copies = quantity WHERE status = 'ready';
       `);
     }
+    if (!orderColumns.includes("deadline")) {
+      database.exec("ALTER TABLE orders ADD COLUMN deadline TEXT");
+    }
     for (const column of Object.values(READ_COLUMN)) {
       if (!orderColumns.includes(column)) {
         database.exec(`ALTER TABLE orders ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
@@ -98,6 +105,7 @@ type OrderRow = {
   status: Status;
   paid: number;
   printed_copies: number;
+  deadline: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -142,6 +150,7 @@ export function listOrders(role: Role): Order[] {
     status: o.status,
     paid: o.paid === 1,
     printedCopies: o.printed_copies,
+    deadline: o.deadline,
     createdAt: o.created_at,
     updatedAt: o.updated_at,
     files: byOrder.get(o.id) ?? [],
@@ -153,22 +162,24 @@ export function listOrders(role: Role): Order[] {
 export function createOrder(
   quantity: number,
   note: string,
+  deadline: string | null,
   files: (OrderFile & { storedName: string })[],
 ) {
   const database = getDb();
   const now = new Date().toISOString();
-  database.transaction(() => {
+  return database.transaction(() => {
     const { lastInsertRowid } = database
       .prepare(
-        "INSERT INTO orders (quantity, note, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO orders (quantity, note, deadline, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
       )
-      .run(quantity, note, now, now);
+      .run(quantity, note, deadline, now, now);
     const insertFile = database.prepare(
       "INSERT INTO files (id, order_id, name, stored_name, mime, size) VALUES (?, ?, ?, ?, ?, ?)",
     );
     for (const f of files) {
       insertFile.run(f.id, lastInsertRowid, f.name, f.storedName, f.mime, f.size);
     }
+    return Number(lastInsertRowid);
   })();
 }
 
@@ -267,4 +278,98 @@ export function getPresence(role: Role): Presence {
     online: lastSeen !== null && Date.now() - Date.parse(lastSeen) < ONLINE_MS,
     lastSeen,
   };
+}
+
+export function getOrderFiles(id: number) {
+  return getDb()
+    .prepare("SELECT * FROM files WHERE order_id = ? AND kind = 'order' ORDER BY rowid")
+    .all(id) as FileRow[];
+}
+
+export function getOrderDetails(id: number) {
+  return getDb()
+    .prepare("SELECT status, deadline FROM orders WHERE id = ?")
+    .get(id) as { status: Status; deadline: string | null } | undefined;
+}
+
+/**
+ * Changes an order at any stage. A Ready order goes back to Ongoing, because the shop has
+ * new work to do. Returns false if the order is gone.
+ */
+export function editOrder(
+  id: number,
+  quantity: number,
+  note: string,
+  deadline: string | null,
+  removeFileIds: string[],
+  newFiles: (OrderFile & { storedName: string })[],
+) {
+  const database = getDb();
+  return database.transaction(() => {
+    const { changes } = database
+      .prepare(
+        `UPDATE orders SET quantity = ?, note = ?, deadline = ?, updated_at = ?,
+           status = CASE WHEN status = 'ready' THEN 'ongoing' ELSE status END,
+           printed_copies = MIN(printed_copies, ?)
+         WHERE id = ?`,
+      )
+      .run(quantity, note, deadline, new Date().toISOString(), quantity, id);
+    if (changes === 0) return false;
+    const remove = database.prepare(
+      "DELETE FROM files WHERE id = ? AND order_id = ? AND kind = 'order'",
+    );
+    for (const fileId of removeFileIds) remove.run(fileId, id);
+    const insert = database.prepare(
+      "INSERT INTO files (id, order_id, name, stored_name, mime, size) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    for (const f of newFiles) insert.run(f.id, id, f.name, f.storedName, f.mime, f.size);
+    return true;
+  })();
+}
+
+/** Deletes a pending order. Returns its stored files, or null if it can't be deleted. */
+export function deleteOrder(id: number) {
+  const database = getDb();
+  return database.transaction(() => {
+    const files = database
+      .prepare("SELECT stored_name FROM files WHERE order_id = ?")
+      .all(id) as { stored_name: string }[];
+    const { changes } = database
+      .prepare("DELETE FROM orders WHERE id = ? AND status = 'pending'")
+      .run(id);
+    return changes > 0 ? files.map((f) => ({ storedName: f.stored_name })) : null;
+  })();
+}
+
+const LAST_SMS = "last_new_design_sms";
+
+/**
+ * Reserves the right to send the new design SMS, if none was sent in the last gapMs.
+ * Returns false if one was, otherwise the previous send time so a failed send can undo it.
+ */
+export function claimSmsSlot(gapMs: number): string | null | false {
+  const database = getDb();
+  return database.transaction(() => {
+    const row = database.prepare("SELECT value FROM settings WHERE key = ?").get(LAST_SMS) as
+      | { value: string }
+      | undefined;
+    const previous = row?.value ?? null;
+    if (previous && Date.now() - Date.parse(previous) < gapMs) return false;
+    database
+      .prepare(
+        `INSERT INTO settings (key, value) VALUES (?, ?)
+         ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(LAST_SMS, new Date().toISOString());
+    return previous;
+  })();
+}
+
+export function releaseSmsSlot(previous: string | null) {
+  const database = getDb();
+  if (previous === null) {
+    database.prepare("DELETE FROM settings WHERE key = ?").run(LAST_SMS);
+  } else {
+    database.prepare("UPDATE settings SET value = ? WHERE key = ?").run(previous, LAST_SMS);
+  }
 }

@@ -21,6 +21,7 @@ export type Order = {
   status: Status;
   paid: boolean;
   printedCopies: number;
+  deadline: string | null;
   createdAt: string;
   updatedAt: string;
   files: OrderFile[];
@@ -54,3 +55,4 @@ export const MAX_QUANTITY = 9999;
 export const MAX_PHOTOS = 10;
 export const MAX_PHOTO_MB = 20;
 export const MAX_MESSAGE_LENGTH = 1000;
+export const DEADLINE_SOON_HOURS = 24;

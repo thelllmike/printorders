@@ -2,7 +2,7 @@
 
 import { type ReactNode, useState } from "react";
 import type { Role } from "@/lib/auth";
-import type { Order, OrderFile, Presence } from "@/lib/types";
+import { DEADLINE_SOON_HOURS, type Order, type OrderFile, type Presence } from "@/lib/types";
 import { FilePreview } from "./FilePreview";
 import { OrderChat } from "./OrderChat";
 import { PdfThumbnail } from "./PdfThumbnail";
@@ -17,6 +17,25 @@ function formatDate(iso: string) {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+function formatDuration(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  const hours = Math.round(minutes / 60);
+  const days = Math.round(minutes / (60 * 24));
+  const [count, unit] =
+    minutes < 60 ? [minutes, "minute"] : hours < 24 ? [hours, "hour"] : [days, "day"];
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
+}
+
+// Finished orders need no warning, and orders due further off stay quiet until they get close.
+function deadlineAlert({ deadline, status }: Order) {
+  if (!deadline || status === "ready") return null;
+  const left = Date.parse(deadline) - Date.now();
+  if (left > DEADLINE_SOON_HOURS * 60 * 60 * 1000) return null;
+  return left < 0
+    ? { level: "overdue", text: `${formatDuration(-left)} overdue` }
+    : { level: "soon", text: `${formatDuration(left)} left` };
 }
 
 // Shows the other side: the customer sees the shop, and the shop sees the customer.
@@ -67,6 +86,20 @@ export function UnreadBanner({ orders }: { orders: Order[] | null }) {
   return (
     <p className="banner" role="status">
       New messages on {unread.map((o) => `order #${o.id}`).join(", ")}
+    </p>
+  );
+}
+
+export function DeadlineBanner({ orders }: { orders: Order[] | null }) {
+  const alerts = (orders ?? []).flatMap((order) => {
+    const alert = deadlineAlert(order);
+    return alert ? [{ ...alert, id: order.id }] : [];
+  });
+  if (alerts.length === 0) return null;
+  const overdue = alerts.some((a) => a.level === "overdue");
+  return (
+    <p className={overdue ? "banner error" : "banner"} role="status">
+      Deadline alert: {alerts.map((a) => `order #${a.id} (${a.text})`).join(", ")}
     </p>
   );
 }
@@ -133,6 +166,18 @@ export function CopiesProgress({ printed, total }: { printed: number; total: num
   );
 }
 
+function Deadline({ order }: { order: Order }) {
+  if (!order.deadline) return null;
+  const alert = deadlineAlert(order);
+  return (
+    <div className={alert ? `deadline ${alert.level}` : "deadline"}>
+      <span>Deadline</span>
+      <time dateTime={order.deadline}>{formatDate(order.deadline)}</time>
+      {alert && <strong>{alert.text}</strong>}
+    </div>
+  );
+}
+
 export function OrderCard({
   order,
   role,
@@ -163,6 +208,7 @@ export function OrderCard({
           <span>{order.quantity === 1 ? "copy" : "copies"}</span>
         </div>
       </div>
+      <Deadline order={order} />
       <ul className="files">
         {order.files.map((file) => (
           <FileRow key={file.id} file={file} onOpen={() => setPreview(file)} />

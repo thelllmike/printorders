@@ -1,12 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getRole } from "@/lib/auth";
 import { createOrder, getPresence, listOrders, recordPresence } from "@/lib/db";
-import {
-  type PreparedFile,
-  prepareFile,
-  removeFiles,
-  saveFile,
-} from "@/lib/storage";
+import { notifyNewDesign } from "@/lib/sms";
+import { prepareOrderFiles, removeFiles, saveFile } from "@/lib/storage";
 import {
   MAX_FILES,
   MAX_FILE_MB,
@@ -48,6 +44,8 @@ export async function POST(req: Request) {
   const uploads = form.getAll("files").filter((f): f is File => f instanceof File);
   const quantity = Number(form.get("quantity"));
   const note = String(form.get("note") ?? "").trim();
+  const deadline = String(form.get("deadline") ?? "");
+  const deadlineTime = Date.parse(deadline);
 
   if (uploads.length === 0) return fail("Add at least one file");
   if (uploads.length > MAX_FILES) return fail(`Add at most ${MAX_FILES} files`);
@@ -57,30 +55,32 @@ export async function POST(req: Request) {
   if (note.length > MAX_NOTE_LENGTH) {
     return fail(`Note can be at most ${MAX_NOTE_LENGTH} characters`);
   }
+  if (deadline && !(deadlineTime > Date.now())) {
+    return fail("Deadline must be in the future");
+  }
   if (uploads.reduce((sum, f) => sum + f.size, 0) > MAX_TOTAL_MB * MB) {
     return fail(tooLarge, 413);
   }
 
-  const prepared: PreparedFile[] = [];
-  for (const upload of uploads) {
-    if (upload.size > MAX_FILE_MB * MB) {
-      return fail(`${upload.name} is larger than ${MAX_FILE_MB} MB`, 413);
-    }
-    const file = await prepareFile(upload);
-    if (!file) {
-      return fail(`${upload.name} is not a PDF, JPG, PNG or WebP file`, 415);
-    }
-    prepared.push(file);
-  }
+  const prepared = await prepareOrderFiles(uploads, MAX_FILE_MB);
+  if ("error" in prepared) return fail(prepared.error, prepared.status);
 
+  let orderId: number;
   try {
     await Promise.all(prepared.map(saveFile));
-    createOrder(quantity, note, prepared);
+    orderId = createOrder(
+      quantity,
+      note,
+      deadline ? new Date(deadlineTime).toISOString() : null,
+      prepared,
+    );
   } catch (error) {
     await removeFiles(prepared);
     console.error("Failed to save order", error);
     return fail("Could not save the order. Please try again.", 500);
   }
 
+  // Sent after the response so the customer isn't kept waiting on the SMS gateway.
+  after(() => notifyNewDesign(orderId));
   return NextResponse.json({ ok: true }, { status: 201 });
 }

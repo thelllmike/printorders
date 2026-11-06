@@ -240,6 +240,21 @@ label { font-size: 0.875rem; font-weight: 600; }
 .note span { color: var(--pending); font-size: 0.75rem; font-weight: 700; }
 .note p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9375rem; }
 
+.deadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+.deadline span { font-size: 0.75rem; font-weight: 700; }
+.order .deadline time { color: var(--ink); font-size: 0.875rem; }
+.deadline strong { margin-left: auto; font-size: 0.8125rem; }
+.deadline.soon { background: var(--pending-soft); color: var(--pending); }
+.deadline.overdue { background: var(--error-soft); color: var(--error); }
+
 .section-title { margin-bottom: 8px; font-size: 0.8125rem; font-weight: 650; }
 .photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
 .photos li { display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -506,6 +521,15 @@ label { font-size: 0.875rem; font-weight: 600; }
 .step { min-width: 40px; }
 .tool.save { border-color: var(--accent); background: var(--accent); color: #fff; }
 .tool.paid { border-color: var(--ready); background: var(--ready-soft); color: var(--ready); }
+.tool.danger { border-color: var(--error); color: var(--error); }
+.tool.danger:hover:not(:disabled) { background: var(--error-soft); }
+.tool:disabled { opacity: 0.6; cursor: default; }
+.order-actions { display: flex; flex-direction: column; gap: 8px; }
+.edit-order { padding-top: 14px; border-top: 1px solid var(--line); }
+.edit-order .add-files { position: relative; align-self: flex-start; cursor: pointer; }
+.chosen li.removed .chosen-name { text-decoration: line-through; color: var(--muted); }
+.locked-note { white-space: normal; }
+.history-note { white-space: normal; margin: -8px 0 16px; }
 .tool-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tool-row .tool { position: relative; text-align: center; }
 .tool input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }

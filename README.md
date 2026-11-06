@@ -1,9 +1,20 @@
 # Print Orders
 
-Send PDFs and images to a print shop with a quantity and a note. The shop marks each
-order Pending, Ongoing or Ready, records how many copies are printed and whether the
-order is paid, and adds photos of the finished work. Both sides can preview PDFs in the
-page and chat about each order, and the customer's page updates within 5 seconds.
+Send PDFs and images to a print shop with a quantity, a note and an optional deadline. The
+shop marks each order Pending, Ongoing or Ready, records how many copies are printed and
+whether the order is paid, and adds photos of the finished work. The shop page warns when
+an unfinished order is within 24 hours of its deadline or past it. Both sides can preview
+PDFs in the page and chat about each order, and the customer's page updates within 5
+seconds.
+
+Orders the shop marks Ready leave the main list and move to History. They can still be
+changed there: the shop can set them back to Ongoing or Pending, and if the customer edits
+a Ready order it goes back to Ongoing.
+
+When the customer uploads a new design, the shop gets an SMS through text.lk. Only one SMS
+is sent every 5 hours, so uploads inside that gap don't send another. Set
+`TEXTLK_API_TOKEN`, `SMS_TO`, `SMS_SENDER_ID` and `SMS_GAP_HOURS` (see `.env.example`);
+with no token, no SMS is sent.
 
 Built with Next.js and SQLite. Everything is stored in the `data/` folder:
 

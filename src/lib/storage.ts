@@ -52,3 +52,24 @@ export async function removeFiles(files: Pick<PreparedFile, "storedName">[]) {
     files.map((f) => fs.rm(path.join(UPLOAD_DIR, f.storedName), { force: true })),
   );
 }
+
+const MB = 1024 * 1024;
+
+/** Checks and reads uploaded order files, or returns the problem with the first bad one. */
+export async function prepareOrderFiles(
+  uploads: File[],
+  maxFileMb: number,
+): Promise<PreparedFile[] | { error: string; status: number }> {
+  const prepared: PreparedFile[] = [];
+  for (const upload of uploads) {
+    if (upload.size > maxFileMb * MB) {
+      return { error: `${upload.name} is larger than ${maxFileMb} MB`, status: 413 };
+    }
+    const file = await prepareFile(upload);
+    if (!file) {
+      return { error: `${upload.name} is not a PDF, JPG, PNG or WebP file`, status: 415 };
+    }
+    prepared.push(file);
+  }
+  return prepared;
+}

@@ -13,6 +13,7 @@ import {
   type Status,
 } from "@/lib/types";
 import {
+  DeadlineBanner,
   Header,
   OfflineBanner,
   OrderCard,
@@ -22,7 +23,15 @@ import {
 } from "./shared";
 import { useOrders } from "./useOrders";
 
-type Filter = Status | "all";
+// Ready orders leave the main list and go to History, where they can still be changed.
+type Filter = "active" | "pending" | "ongoing" | "history";
+
+const FILTERS: { id: Filter; label: string; match: (status: Status) => boolean }[] = [
+  { id: "active", label: "All active", match: (s) => s !== "ready" },
+  { id: "pending", label: STATUS_LABELS.pending, match: (s) => s === "pending" },
+  { id: "ongoing", label: STATUS_LABELS.ongoing, match: (s) => s === "ongoing" },
+  { id: "history", label: "History", match: (s) => s === "ready" },
+];
 
 const PHOTO_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
 
@@ -171,7 +180,7 @@ function ShopOrder({
 
 export default function ShopView() {
   const { orders, setOrders, offline, presence, refresh } = useOrders();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("active");
   const [error, setError] = useState("");
 
   // Sends a request, shows what went wrong if it fails, and reloads the orders either way.
@@ -228,9 +237,9 @@ export default function ShopView() {
     );
   }
 
-  const visible = orders?.filter((o) => filter === "all" || o.status === filter);
-  const count = (f: Filter) =>
-    orders?.filter((o) => f === "all" || o.status === f).length ?? 0;
+  const matches = (f: Filter) => FILTERS.find((x) => x.id === f)!.match;
+  const visible = orders?.filter((o) => matches(filter)(o.status));
+  const count = (f: Filter) => orders?.filter((o) => matches(f)(o.status)).length ?? 0;
 
   return (
     <main className="page">
@@ -239,26 +248,36 @@ export default function ShopView() {
         status={<PresenceStatus presence={presence} role="shop" />}
       />
       <OfflineBanner show={offline} />
+      <DeadlineBanner orders={orders} />
       <UnreadBanner orders={orders} />
       <OrderTotals orders={orders} />
       {error && <p className="banner error" role="alert">{error}</p>}
 
       <div className="tabs" role="group" aria-label="Filter orders">
-        {(["all", ...STATUSES] as Filter[]).map((f) => (
+        {FILTERS.map(({ id, label }) => (
           <button
-            key={f}
-            className={filter === f ? "tab active" : "tab"}
-            aria-pressed={filter === f}
-            onClick={() => setFilter(f)}
+            key={id}
+            className={filter === id ? "tab active" : "tab"}
+            aria-pressed={filter === id}
+            onClick={() => setFilter(id)}
           >
-            {f === "all" ? "All" : STATUS_LABELS[f]}
-            <span>{count(f)}</span>
+            {label}
+            <span>{count(id)}</span>
           </button>
         ))}
       </div>
 
       {orders === null && <p className="empty">Loading…</p>}
-      {visible?.length === 0 && <p className="empty">No orders here.</p>}
+      {filter === "history" && visible && visible.length > 0 && (
+        <p className="muted history-note">
+          Finished orders. Press Ongoing or Pending on an order to move it back to the main list.
+        </p>
+      )}
+      {visible?.length === 0 && (
+        <p className="empty">
+          {filter === "history" ? "Orders you mark Ready will show here." : "No orders here."}
+        </p>
+      )}
 
       <div className="shop-grid">
         {visible?.map((order) => (
